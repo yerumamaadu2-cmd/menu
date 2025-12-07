@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Bablu Cafe Orders</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      margin: 0;
+      padding: 16px;
+      max-width: 600px;
+      margin-inline: auto;
+      background: #f5f5f5;
+    }
+    h1, h2 {
+      text-align: center;
+    }
+    .menu-item, .cart-item {
+      background: #ffffff;
+      padding: 12px;
+      margin-bottom: 8px;
+      border-radius: 10px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .menu-item.disabled {
+      opacity: 0.5;
+    }
+    button {
+      border: none;
+      padding: 6px 12px;
+      border-radius: 999px;
+      cursor: pointer;
+    }
+    .btn-primary {
+      background: #2563eb;
+      color: white;
+      font-weight: 600;
+    }
+    .btn-qty {
+      padding: 4px 10px;
+    }
+    .section {
+      margin-top: 20px;
+    }
+    .total-line {
+      font-weight: 700;
+      font-size: 1.1rem;
+      text-align: right;
+      margin-top: 8px;
+    }
+    .payment-options {
+      display: flex;
+      gap: 16px;
+      margin-top: 10px;
+    }
+    label {
+      font-size: 0.95rem;
+    }
+    input[type="text"], input[type="tel"] {
+      width: 100%;
+      padding: 8px;
+      margin-top: 4px;
+      margin-bottom: 10px;
+      border-radius: 8px;
+      border: 1px solid #ddd;
+      box-sizing: border-box;
+    }
+    .note {
+      font-size: 0.8rem;
+      color: #666;
+      margin-top: 4px;
+    }
+    .status {
+      margin-top: 10px;
+      font-size: 0.9rem;
+    }
+    .status.success { color: #16a34a; }
+    .status.error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+  <h1>🍽️ Bablu Cafe Orders</h1>
+
+  <div class="section">
+    <h2>Menu</h2>
+    <div id="menu"></div>
+  </div>
+
+  <div class="section">
+    <h2>Cart</h2>
+    <div id="cart"></div>
+    <div id="cart-total" class="total-line">Total: ₹0</div>
+  </div>
+
+  <div class="section">
+    <h2>Customer Details</h2>
+    <label>
+      Name
+      <input type="text" id="customer-name" placeholder="Your name" />
+    </label>
+    <label>
+      Phone Number
+      <input type="tel" id="customer-phone" placeholder="10-digit mobile number" />
+    </label>
+
+    <h3>Payment Method</h3>
+    <div class="payment-options">
+      <label>
+        <input type="radio" name="payment" value="Cash on Takeaway" checked />
+        Cash on Takeaway
+      </label>
+      <label>
+        <input type="radio" name="payment" value="Prepaid" />
+        Prepaid
+      </label>
+    </div>
+    <div class="note">
+      Note: Prepaid instructions (UPI / QR) will be shared by shop.
+    </div>
+
+    <button id="place-order" class="btn-primary" style="margin-top:16px; width:100%;">
+      Place Order (WhatsApp)
+    </button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    // 🧾 MENU ITEMS – inga un shop items
+    const menuItems = [
+      { id: 'chicken-momos', name: 'Chicken Momos (6 pcs)', price: 60, soldOut: false },
+      { id: 'veg-momos', name: 'Veg Momos (6 pcs)', price: 50, soldOut: false },
+      { id: 'veg-puffs', name: 'Veg Puffs', price: 25, soldOut: false },
+      { id: 'egg-puffs', name: 'Egg Puffs', price: 30, soldOut: false },
+      { id: 'choco-cake', name: 'Chocolate Slice Cake', price: 50, soldOut: true }
+    ];
+
+    let cart = [];
+
+    function renderMenu() {
+      const menuDiv = document.getElementById('menu');
+      menuDiv.innerHTML = '';
+
+      menuItems.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'menu-item' + (item.soldOut ? ' disabled' : '');
+        div.innerHTML = `
+          <div>
+            <div><strong>${item.name}</strong></div>
+            <div>₹${item.price}</div>
+            ${item.soldOut ? '<div style="color:red;font-size:0.8rem;">Sold Out</div>' : ''}
+          </div>
+          <div>
+            ${
+              item.soldOut
+                ? ''
+                : `<button class="btn-primary" onclick="addToCart('${item.id}')">Add to Cart</button>`
+            }
+          </div>
+        `;
+        menuDiv.appendChild(div);
+      });
+    }
+
+    function addToCart(id) {
+      const item = menuItems.find(m => m.id === id);
+      if (!item || item.soldOut) return;
+
+      const existing = cart.find(c => c.id === id);
+      if (existing) {
+        existing.qty += 1;
+      } else {
+        cart.push({ id: item.id, name: item.name, price: item.price, qty: 1 });
+      }
+      renderCart();
+    }
+
+    function changeQty(id, delta) {
+      const item = cart.find(c => c.id === id);
+      if (!item) return;
+      item.qty += delta;
+      if (item.qty <= 0) {
+        cart = cart.filter(c => c.id !== id);
+      }
+      renderCart();
+    }
+
+    function renderCart() {
+      const cartDiv = document.getElementById('cart');
+      cartDiv.innerHTML = '';
+
+      if (cart.length === 0) {
+        cartDiv.innerText = 'Cart is empty.';
+        document.getElementById('cart-total').innerText = 'Total: ₹0';
+        return;
+      }
+
+      let total = 0;
+
+      cart.forEach(item => {
+        const itemTotal = item.price * item.qty;
+        total += itemTotal;
+
+        const div = document.createElement('div');
+        div.className = 'cart-item';
+        div.innerHTML = `
+          <div>
+            <div><strong>${item.name}</strong></div>
+            <div>₹${item.price} × ${item.qty} = ₹${itemTotal}</div>
+          </div>
+          <div>
+            <button class="btn-qty" onclick="changeQty('${item.id}', -1)">-</button>
+            <button class="btn-qty" onclick="changeQty('${item.id}', 1)">+</button>
+          </div>
+        `;
+        cartDiv.appendChild(div);
+      });
+
+      document.getElementById('cart-total').innerText = 'Total: ₹' + total;
+    }
+
+    function placeOrder() {
+      const statusEl = document.getElementById('status');
+      statusEl.className = 'status';
+      statusEl.innerText = '';
+
+      if (cart.length === 0) {
+        statusEl.classList.add('error');
+        statusEl.innerText = 'Cart is empty.';
+        return;
+      }
+
+      const name = document.getElementById('customer-name').value.trim();
+      const phone = document.getElementById('customer-phone').value.trim();
+      const payment = document.querySelector('input[name="payment"]:checked').value;
+
+      if (!name || !phone) {
+        statusEl.classList.add('error');
+        statusEl.innerText = 'Please enter your name and phone number.';
+        return;
+      }
+
+      const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0);
+
+      let itemsText = cart
+        .map(item => `${item.name} × ${item.qty} = ₹${item.price * item.qty}`)
+        .join('\n');
+
+      const message = `
+New Bablu Cafe Order
+Name: ${name}
+Phone: ${phone}
+Payment: ${payment}
+
+Items:
+${itemsText}
+
+Total: ₹${total}
+      `.trim();
+
+      // 🔐 Inga un shop phone number podu (91 + number)
+      const shopPhone = '917418758308'; // e.g. 91XXXXXXXXXX
+
+      const url = `https://wa.me/${shopPhone}?text=${encodeURIComponent(message)}`;
+      window.open(url, '_blank');
+
+      statusEl.classList.add('success');
+      statusEl.innerText = 'Opening WhatsApp with your order...';
+      cart = [];
+      renderCart();
+    }
+
+    document.getElementById('place-order').addEventListener('click', placeOrder);
+
+    renderMenu();
+    renderCart();
+  </script>
+</body>
+</html>
